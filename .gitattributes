@@ -1,0 +1,34 @@
+# Normalize all text files to LF in the repo and in working trees on every OS
+# (Windows and macOS), so KiCad, ESP-IDF and web files stay byte-identical.
+* text=auto eol=lf
+
+# Windows-only scripts need CRLF
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# KiCad (text, LF; large generated files not diffed)
+*.kicad_sch   text eol=lf
+*.kicad_pcb   text eol=lf
+*.kicad_pro   text eol=lf
+*.kicad_sym   text eol=lf
+*.kicad_mod   text eol=lf
+*.kicad_dru   text eol=lf
+sym-lib-table text eol=lf
+fp-lib-table  text eol=lf
+*.step  text eol=lf -diff
+*.stp   text eol=lf -diff
+*.wrl   text eol=lf -diff
+
+# Binary files
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary
+*.bin   binary
+*.elf   binary
+*.woff  binary
+*.woff2 binary
