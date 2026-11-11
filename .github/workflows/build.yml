@@ -41,7 +41,7 @@ jobs:
             {"name": "windows-x64", "os": "windows-2022",     "preset": "windows", "triplet": "x64-windows-static", "public_only": false},
             {"name": "linux-x64",   "os": "ubuntu-22.04",     "preset": "linux",   "triplet": "x64-linux",          "public_only": false},
             {"name": "linux-arm64", "os": "ubuntu-22.04-arm", "preset": "linux",   "triplet": "arm64-linux",        "public_only": true},
-            {"name": "macos-arm64", "os": "macos-14",         "preset": "macos",   "triplet": "arm64-osx",          "public_only": true}
+            {"name": "macos-arm64", "os": "macos-15",         "preset": "macos",   "triplet": "arm64-osx",          "public_only": true}
           ]'
           matrix=$(jq -c --argjson public "$PUBLIC" '{include: [.[] | select($public or (.public_only | not))]}' <<<"$all")
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
@@ -176,7 +176,20 @@ jobs:
           fi
           name="kirend-$version-${{ matrix.name }}"
           mkdir -p "dist/$name"
-          cp '${{ steps.bin.outputs.path }}' README.md "dist/$name/"
+          cp '${{ steps.bin.outputs.path }}' README.md LICENSE "dist/$name/"
+          # The BSD/MIT/LGPL licenses of the statically linked libraries must ship with the binary.
+          # vcpkg puts each port's license in vcpkg_installed/<triplet>/share/<port>/copyright.
+          # GoogleTest (tests only) and vcpkg's own helper ports are not part of the binary.
+          {
+            for f in build/${{ matrix.preset }}/vcpkg_installed/${{ matrix.triplet }}/share/*/copyright; do
+              port=$(basename "$(dirname "$f")")
+              case "$port" in gtest|vcpkg-*) continue ;; esac
+              printf '%s\n%s\n%s\n\n' "================================================================" "$port" "================================================================"
+              cat "$f"
+              printf '\n\n'
+            done
+          } > "dist/$name/THIRD-PARTY-LICENSES.txt"
+          grep -c '^=====' "dist/$name/THIRD-PARTY-LICENSES.txt"
           cd dist
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             7z a -tzip "$name.zip" "$name" > /dev/null

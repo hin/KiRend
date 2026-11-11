@@ -9,6 +9,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# All KiRend binaries are standalone. With MSVC, link the C/C++ runtime statically (/MT), matching
+# the x64-windows-static vcpkg triplet, so kirend.exe doesn't need the VC++ redistributable.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 option(KIREND_BUILD_TESTS "Build unit tests" ON)
 
 find_package(OpenCASCADE CONFIG REQUIRED)
@@ -69,6 +73,11 @@ endif()
 # the MinGW runtime DLLs. All other dependencies are static through the vcpkg triplet.
 if(MINGW)
     target_link_options(kirend_core PUBLIC -static)
+endif()
+
+# Linux: link libstdc++ and libgcc statically, so the only shared library kirend needs is glibc.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(kirend_core PUBLIC -static-libstdc++ -static-libgcc)
 endif()
 
 # OpenCASCADE headers use M_PI, which MinGW and MSVC only define with _USE_MATH_DEFINES in strict

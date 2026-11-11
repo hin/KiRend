@@ -31,7 +31,7 @@
       "displayName": "Windows (Visual Studio 2022, x64)",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
-      "cacheVariables": { "VCPKG_TARGET_TRIPLET": "x64-windows-static-md" },
+      "cacheVariables": { "VCPKG_TARGET_TRIPLET": "x64-windows-static" },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
     },
     {

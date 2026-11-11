@@ -22,7 +22,7 @@ Run `kirend --help` for all options. See [docs/DESIGN.md](docs/DESIGN.md) for ho
 Prebuilt binaries for Windows (x64), Linux (x64, arm64) and macOS (Apple Silicon) are attached to
 each [GitHub Release](https://github.com/hin/KiRend/releases). Each is a single standalone file
 with no runtime libraries to install. The Linux binary needs glibc 2.35 or newer (Ubuntu 22.04,
-Debian 12 or later); the macOS binary needs macOS 14 or newer.
+Debian 12 or later); the macOS binary needs macOS 15 or newer.
 
 The macOS binary is not signed. After downloading it with a browser, remove the quarantine flag
 once: `xattr -d com.apple.quarantine kirend`.
@@ -103,8 +103,9 @@ cmake --build --preset windows
 ctest --preset windows
 ```
 
-The `windows` preset uses the Visual Studio generator and the `x64-windows-static-md` triplet,
-so the dependencies are linked statically and `kirend.exe` runs without extra DLLs. The binary
+The `windows` preset uses the Visual Studio generator and the `x64-windows-static` triplet, and
+links the C/C++ runtime statically too, so `kirend.exe` runs without extra DLLs or the VC++
+redistributable. If you built with this preset before, delete `build\windows` first. The binary
 is `build\windows\Release\kirend.exe`. Keep the source path short (for example `C:\dev\kirend`),
 because OpenCASCADE's build can hit Windows' path length limit.
 
