@@ -1,25 +1,16 @@
 #pragma once
 
 #include "render/line_renderer.h"
+#include "style/style.h"
 
 #include <string>
 #include <vector>
 
 namespace kirend::output {
 
-enum class Background { White, Transparent };
-
-struct SvgStyle
-{
-    double     lineWidth = 1.5;    ///< px, inner edges
-    double     outlineWidth = 3.0; ///< px, silhouettes and outer edges
-    Background background = Background::White;
-};
-
-/// Default line widths for an image of the given height (1.5 / 3 px at 900 px).
-SvgStyle DefaultStyle( int aImageHeight );
-
+/// Write the lines as SVG. Line widths in aStyle (points) are converted to pixels with aDpi.
+/// aStyle.background nullopt gives a transparent background.
 std::string WriteSvg( const std::vector<render::Polyline2D>& aLines, int aWidth, int aHeight,
-                      const SvgStyle& aStyle );
+                      const style::Style& aStyle, double aDpi );
 
 } // namespace kirend::output

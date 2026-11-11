@@ -1,0 +1,48 @@
+# KiRend style sheet
+#
+# This is KiRend's built-in default style; it is compiled into the program and used when no
+# --style is given. To make your own style, write a file with only the settings you want to
+# change and pass it with --style FILE. Everything you leave out keeps the value shown here.
+#
+# A style sheet only controls how things look. The view (--side, --rotate, --zoom, ...) and the
+# image size stay on the command line, so one style can be used for any board and any view.
+# Options given on the command line win over the style sheet.
+#
+# Widths are in points (1 pt = 1/72 inch) on the printed image. They are converted to pixels
+# with the image DPI (--dpi, default 300), so 0.7 pt is about 2.9 px at 300 DPI. A width can be
+# written as a number (0.5) or with the unit (0.5pt).
+#
+# Colours are "#rrggbb" or "#rgb". Put them in quotes: in YAML an unquoted # starts a comment.
+
+# Image background: a colour, or "transparent".
+# --background transparent overrides it; --background opaque uses white if this is transparent.
+background: "#ffffff"
+
+# What is drawn.
+visible:
+  # Layers to draw. Edge.Cuts draws the board body; copper layers draw pads, tracks and vias;
+  # other layers draw their graphics. User names like F.Silkscreen work too.
+  # --layers overrides this list.
+  layers: [Edge.Cuts]
+  models: true      # 3D models of footprints
+  dnp: false        # 3D models of footprints marked "Do not populate"
+  pads: true        # pads on the copper layers in the list
+  tracks: true      # tracks and track arcs on the copper layers in the list
+  vias: true        # vias on the copper layers in the list
+  graphics: true    # lines, shapes and footprint graphics on the layers in the list
+
+# How lines are drawn. The board body and 3D models have two kinds of lines:
+#   outline: silhouettes and open edges, drawn thicker
+#   edge:    sharp edges inside the outline
+# Lines on board layers have one kind.
+lines:
+  board:
+    outline: { width: 0.70pt, color: "#000000" }
+    edge:    { width: 0.35pt, color: "#000000" }
+  models:
+    outline: { width: 0.70pt, color: "#000000" }
+    edge:    { width: 0.35pt, color: "#000000" }
+  pads:     { width: 0.35pt, color: "#000000" }
+  tracks:   { width: 0.35pt, color: "#000000" }
+  vias:     { width: 0.35pt, color: "#000000" }
+  graphics: { width: 0.35pt, color: "#000000" }

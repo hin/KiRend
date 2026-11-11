@@ -18,8 +18,18 @@ std::string CanonicalLayerName( const std::string& aName, const pcb::Board& aBoa
 /// Polygon of a pad's copper shape in board coordinates.
 std::vector<Polygon> PadPolygons( const pcb::Pad& aPad );
 
-/// Lines for one layer (everything except the board body).
-render::LineSet BuildLayerLines( const pcb::Board& aBoard, const std::string& aLayer,
-                                 const BoardHeights& aHeights );
+/// What BuildLayerLines() draws.
+struct LayerContent
+{
+    bool pads = true;
+    bool tracks = true;
+    bool vias = true;
+    bool graphics = true;
+};
+
+/// Lines for one layer (everything except the board body): one line set each for graphics,
+/// pads, tracks and vias, with the matching line category. Sets can be empty.
+std::vector<render::LineSet> BuildLayerLines( const pcb::Board& aBoard, const std::string& aLayer,
+                                              const BoardHeights& aHeights, const LayerContent& aContent = {} );
 
 } // namespace kirend

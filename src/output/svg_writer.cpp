@@ -34,11 +34,12 @@ void appendNumber( std::string& aOut, double aValue )
 }
 
 
-void appendPaths( std::string& aOut, const std::vector<render::Polyline2D>& aLines, bool aOutline )
+void appendPaths( std::string& aOut, const std::vector<render::Polyline2D>& aLines, bool aOutline,
+                  style::LineCategory aCategory )
 {
     for( const render::Polyline2D& line : aLines )
     {
-        if( line.outline != aOutline || line.points.size() < 2 )
+        if( line.outline != aOutline || line.category != aCategory || line.points.size() < 2 )
             continue;
 
         aOut += "<path d=\"M";
@@ -62,17 +63,8 @@ void appendPaths( std::string& aOut, const std::vector<render::Polyline2D>& aLin
 } // namespace
 
 
-SvgStyle DefaultStyle( int aImageHeight )
-{
-    SvgStyle style;
-    style.lineWidth = std::max( 1.0, aImageHeight / 600.0 );
-    style.outlineWidth = style.lineWidth * 2.0;
-    return style;
-}
-
-
 std::string WriteSvg( const std::vector<render::Polyline2D>& aLines, int aWidth, int aHeight,
-                      const SvgStyle& aStyle )
+                      const style::Style& aStyle, double aDpi )
 {
     std::string out;
     out.reserve( 1024 + aLines.size() * 64 );
@@ -82,22 +74,45 @@ std::string WriteSvg( const std::vector<render::Polyline2D>& aLines, int aWidth,
            + "\" height=\"" + std::to_string( aHeight ) + "\" viewBox=\"0 0 " + std::to_string( aWidth )
            + " " + std::to_string( aHeight ) + "\">\n";
 
-    if( aStyle.background == Background::White )
-        out += "<rect width=\"100%\" height=\"100%\" fill=\"#ffffff\"/>\n";
+    if( aStyle.background )
+        out += "<rect width=\"100%\" height=\"100%\" fill=\"" + aStyle.background->hex() + "\"/>\n";
 
-    auto group = [&]( const char* aId, double aWidthPx, bool aOutline )
+    auto hasLines = [&]( bool aOutline, style::LineCategory aCategory )
     {
-        out += "<g id=\"";
-        out += aId;
-        out += "\" fill=\"none\" stroke=\"#000000\" stroke-width=\"";
-        appendNumber( out, aWidthPx );
-        out += "\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n";
-        appendPaths( out, aLines, aOutline );
-        out += "</g>\n";
+        return std::any_of( aLines.begin(), aLines.end(),
+                            [&]( const render::Polyline2D& l )
+                            { return l.outline == aOutline && l.category == aCategory && l.points.size() >= 2; } );
     };
 
-    group( "edges", aStyle.lineWidth, false );
-    group( "outlines", aStyle.outlineWidth, true );
+    // One group per line category and kind, e.g. "models-edges" and "models-outlines". Board
+    // layer categories only have edges. Outlines are drawn last, on top of the edges.
+    for( bool outline : { false, true } )
+    {
+        for( size_t i = 0; i < style::LINE_CATEGORY_COUNT; ++i )
+        {
+            const auto category = static_cast<style::LineCategory>( i );
+
+            if( !hasLines( outline, category ) )
+                continue;
+
+            const style::CategoryStrokes& strokes = aStyle.strokes( category );
+            const style::Stroke&          stroke = outline ? strokes.outline : strokes.edge;
+
+            const bool hasKinds = category == style::LineCategory::Board || category == style::LineCategory::Models;
+
+            out += "<g id=\"";
+            out += style::CategoryName( category );
+
+            if( hasKinds )
+                out += outline ? "-outlines" : "-edges";
+
+            out += "\" fill=\"none\" stroke=\"" + stroke.color.hex() + "\" stroke-width=\"";
+            appendNumber( out, style::PointsToPixels( stroke.widthPt, aDpi ) );
+            out += "\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n";
+            appendPaths( out, aLines, outline, category );
+            out += "</g>\n";
+        }
+    }
 
     out += "</svg>\n";
     return out;

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "geometry/vec.h"
+#include "style/style.h"
 
 #include <array>
 #include <cstdint>
@@ -15,6 +16,8 @@ struct Mesh
     std::vector<std::array<uint32_t, 3>> triangles;
     /// Edges that are always drawn when visible (sharp B-rep edges, creases), as vertex pairs.
     std::vector<std::array<uint32_t, 2>> featureEdges;
+    /// How the mesh's lines are styled.
+    style::LineCategory                  category = style::LineCategory::Models;
 
     void append( const Mesh& aOther );
 };
@@ -23,6 +26,7 @@ struct Mesh
 struct LineSet
 {
     std::vector<std::vector<Vec3>> polylines;
+    style::LineCategory            category = style::LineCategory::Graphics;
 };
 
 struct Scene

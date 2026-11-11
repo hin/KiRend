@@ -13,6 +13,7 @@ struct Polyline2D
 {
     std::vector<Vec2> points; ///< Output image pixels
     bool              outline = false; ///< Silhouette / outer edge (drawn thicker)
+    style::LineCategory category = style::LineCategory::Models;
 };
 
 struct LineRenderOptions

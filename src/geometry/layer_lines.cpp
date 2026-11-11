@@ -326,13 +326,23 @@ std::vector<Polygon> PadPolygons( const Pad& aPad )
 }
 
 
-render::LineSet BuildLayerLines( const pcb::Board& aBoard, const std::string& aLayer,
-                                 const BoardHeights& aHeights )
+std::vector<render::LineSet> BuildLayerLines( const pcb::Board& aBoard, const std::string& aLayer,
+                                              const BoardHeights& aHeights, const LayerContent& aContent )
 {
-    render::LineSet out;
-    const double    z = layerZ( aLayer, aBoard, aHeights );
+    using style::LineCategory;
 
-    auto addPolygon = [&]( const Polygon& aPoly )
+    render::LineSet graphics;
+    render::LineSet pads;
+    render::LineSet tracks;
+    render::LineSet vias;
+    graphics.category = LineCategory::Graphics;
+    pads.category = LineCategory::Pads;
+    tracks.category = LineCategory::Tracks;
+    vias.category = LineCategory::Vias;
+
+    const double z = layerZ( aLayer, aBoard, aHeights );
+
+    auto addPolygon = [&]( const Polygon& aPoly, render::LineSet& out )
     {
         if( aPoly.size() < 2 )
             return;
@@ -346,21 +356,27 @@ render::LineSet BuildLayerLines( const pcb::Board& aBoard, const std::string& aL
         out.polylines.push_back( std::move( line ) );
     };
 
-    for( const Shape& s : aBoard.drawings )
+    if( aContent.graphics )
     {
-        if( s.layer == aLayer )
-            addShapeLines( s, z, out );
+        for( const Shape& s : aBoard.drawings )
+        {
+            if( s.layer == aLayer )
+                addShapeLines( s, z, graphics );
+        }
     }
 
     for( const pcb::Footprint& fp : aBoard.footprints )
     {
-        for( const Shape& s : fp.graphics )
+        if( aContent.graphics )
         {
-            if( s.layer == aLayer )
-                addShapeLines( s, z, out );
+            for( const Shape& s : fp.graphics )
+            {
+                if( s.layer == aLayer )
+                    addShapeLines( s, z, graphics );
+            }
         }
 
-        if( !isCopperLayer( aLayer ) )
+        if( !isCopperLayer( aLayer ) || !aContent.pads )
             continue;
 
         for( const Pad& pad : fp.pads )
@@ -369,7 +385,7 @@ render::LineSet BuildLayerLines( const pcb::Board& aBoard, const std::string& aL
                 continue;
 
             for( const Polygon& poly : PadPolygons( pad ) )
-                addPolygon( poly );
+                addPolygon( poly, pads );
         }
     }
 
@@ -377,26 +393,27 @@ render::LineSet BuildLayerLines( const pcb::Board& aBoard, const std::string& aL
     {
         for( const pcb::Track& t : aBoard.tracks )
         {
-            if( t.layer != aLayer )
+            if( !aContent.tracks || t.layer != aLayer )
                 continue;
 
             std::vector<Vec2> path = t.isArc ? ApproximateArc( t.start, t.mid, t.end )
                                              : std::vector<Vec2>{ t.start, t.end };
-            addPolygon( strokeOutline( path, t.width ) );
+            addPolygon( strokeOutline( path, t.width ), tracks );
         }
 
         for( const pcb::Via& v : aBoard.vias )
         {
             // Through vias list "F.Cu" "B.Cu"; they appear on both outer layers.
-            bool onLayer = v.layers.empty()
-                           || std::find( v.layers.begin(), v.layers.end(), aLayer ) != v.layers.end();
+            bool onLayer = aContent.vias
+                           && ( v.layers.empty()
+                                || std::find( v.layers.begin(), v.layers.end(), aLayer ) != v.layers.end() );
 
             if( onLayer )
-                addPolygon( ApproximateCircle( v.position, v.size / 2.0 ) );
+                addPolygon( ApproximateCircle( v.position, v.size / 2.0 ), vias );
         }
     }
 
-    return out;
+    return { std::move( graphics ), std::move( pads ), std::move( tracks ), std::move( vias ) };
 }
 
 } // namespace kirend

@@ -20,6 +20,7 @@ find_package(zstd CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(argparse CONFIG REQUIRED)
 find_package(lunasvg CONFIG REQUIRED)
+find_package(yaml-cpp CONFIG REQUIRED)
 
 if(TARGET zstd::libzstd)
     set(KIREND_ZSTD_TARGET zstd::libzstd)
@@ -28,6 +29,17 @@ elseif(TARGET zstd::libzstd_static)
 else()
     set(KIREND_ZSTD_TARGET zstd::libzstd_shared)
 endif()
+
+# The built-in default style sheet is compiled in from styles/default.yaml.
+set(KIREND_DEFAULT_STYLE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/styles/default.yaml)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${KIREND_DEFAULT_STYLE_FILE})
+file(READ ${KIREND_DEFAULT_STYLE_FILE} KIREND_DEFAULT_STYLE)
+string(LENGTH "${KIREND_DEFAULT_STYLE}" KIREND_DEFAULT_STYLE_LENGTH)
+if(KIREND_DEFAULT_STYLE_LENGTH GREATER 16000)
+    # MSVC limits a single string literal to about 16 KB.
+    message(FATAL_ERROR "styles/default.yaml is too long to compile in (${KIREND_DEFAULT_STYLE_LENGTH} bytes)")
+endif()
+configure_file(src/style/default_style.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/generated/default_style.cpp @ONLY)
 
 # Library with everything except main(), so tests can link against it.
 add_library(kirend_core STATIC
@@ -47,6 +59,8 @@ add_library(kirend_core STATIC
     src/render/line_renderer.cpp
     src/output/svg_writer.cpp
     src/output/png_writer.cpp
+    src/style/style.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/default_style.cpp
     src/cli/options.cpp
     src/kirend.cpp
 )
@@ -61,6 +75,7 @@ target_link_libraries(kirend_core PUBLIC
     nlohmann_json::nlohmann_json
     argparse::argparse
     lunasvg::lunasvg
+    yaml-cpp::yaml-cpp
 )
 
 if(MSVC)
