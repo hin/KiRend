@@ -78,6 +78,19 @@ endif()
 # Linux: link libstdc++ and libgcc statically, so the only shared library kirend needs is glibc.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(kirend_core PUBLIC -static-libstdc++ -static-libgcc)
+
+    # OpenCASCADE's CMake config lists "stdc++" as a thread library of TKernel. That explicit
+    # -lstdc++ links the shared libstdc++ even with -static-libstdc++, so drop it from the
+    # OpenCASCADE targets; the compiler driver links libstdc++ statically by itself.
+    foreach(occt_target IN LISTS OpenCASCADE_LIBRARIES)
+        if(TARGET ${occt_target})
+            get_target_property(occt_link_libs ${occt_target} INTERFACE_LINK_LIBRARIES)
+            if(occt_link_libs)
+                list(FILTER occt_link_libs EXCLUDE REGEX "^(\\$<LINK_ONLY:)?stdc\\+\\+>?$")
+                set_target_properties(${occt_target} PROPERTIES INTERFACE_LINK_LIBRARIES "${occt_link_libs}")
+            endif()
+        endif()
+    endforeach()
 endif()
 
 # OpenCASCADE headers use M_PI, which MinGW and MSVC only define with _USE_MATH_DEFINES in strict
