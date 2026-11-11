@@ -1,0 +1,228 @@
+# Builds and tests KiRend on every push, and publishes standalone binaries as a GitHub Release
+# when a tag like v0.1.0 is pushed.
+#
+# vcpkg's binary cache is kept in the GitHub Actions cache, so OpenCASCADE and the other
+# dependencies are only compiled when they change (or when the runner's compiler changes).
+
+name: Build
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Never cancel a release build.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  platforms:
+    name: Select platforms
+    # Pull requests from branches in this repo are already built by the push event.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - id: select
+        name: Select platforms
+        env:
+          # macOS minutes cost 10x on private repos, and the arm64 Linux runners are only free for
+          # public repos, so those two platforms only run once the repo is public.
+          PUBLIC: ${{ github.event.repository.private == false }}
+        run: |
+          all='[
+            {"name": "windows-x64", "os": "windows-2022",     "preset": "windows", "triplet": "x64-windows-static", "public_only": false},
+            {"name": "linux-x64",   "os": "ubuntu-22.04",     "preset": "linux",   "triplet": "x64-linux",          "public_only": false},
+            {"name": "linux-arm64", "os": "ubuntu-22.04-arm", "preset": "linux",   "triplet": "arm64-linux",        "public_only": true},
+            {"name": "macos-arm64", "os": "macos-14",         "preset": "macos",   "triplet": "arm64-osx",          "public_only": true}
+          ]'
+          matrix=$(jq -c --argjson public "$PUBLIC" '{include: [.[] | select($public or (.public_only | not))]}' <<<"$all")
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "$matrix" | jq .
+
+  build:
+    name: ${{ matrix.name }}
+    needs: platforms
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      VCPKG_DISABLE_METRICS: '1'
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Install Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Set up vcpkg at the pinned baseline
+        run: |
+          temp="$RUNNER_TEMP"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then temp=$(cygpath -m "$RUNNER_TEMP"); fi
+          VCPKG_ROOT="$temp/vcpkg"
+          VCPKG_CACHE="$temp/vcpkg-cache"
+          echo "VCPKG_ROOT=$VCPKG_ROOT" >> "$GITHUB_ENV"
+          echo "VCPKG_CACHE=$VCPKG_CACHE" >> "$GITHUB_ENV"
+          baseline=$(jq -r '."builtin-baseline"' vcpkg.json)
+          git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" checkout --quiet "$baseline"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cmd //c "$(cygpath -w "$VCPKG_ROOT")\\bootstrap-vcpkg.bat" -disableMetrics
+          else
+            "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+          if [[ "$RUNNER_OS" == "Linux" && "$(uname -m)" == "aarch64" ]]; then
+            # vcpkg uses the runner's own CMake and Ninja on arm64 Linux.
+            echo "VCPKG_FORCE_SYSTEM_BINARIES=1" >> "$GITHUB_ENV"
+          fi
+          mkdir -p "$VCPKG_CACHE"
+          echo "VCPKG_BINARY_SOURCES=clear;files,$VCPKG_CACHE,readwrite" >> "$GITHUB_ENV"
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.VCPKG_CACHE }}
+          key: vcpkg-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}-
+            vcpkg-${{ matrix.triplet }}-
+
+      - name: Count cached packages
+        id: cache_before
+        run: echo "files=$(find "$VCPKG_CACHE" -type f | wc -l)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure (installs dependencies with vcpkg)
+        run: cmake --preset ${{ matrix.preset }}
+
+      # Save right after the dependencies are built, so a failure later in the job doesn't throw
+      # away an hour of OpenCASCADE compilation. Only saves when vcpkg added something new.
+      - name: Check for new cached packages
+        id: cache_after
+        if: always()
+        run: echo "files=$(find "$VCPKG_CACHE" -type f | wc -l)" >> "$GITHUB_OUTPUT"
+
+      - name: Save vcpkg binary cache
+        if: always() && steps.cache_after.outputs.files != steps.cache_before.outputs.files
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.VCPKG_CACHE }}
+          key: vcpkg-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}-${{ github.run_id }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}
+
+      - name: Locate binary
+        id: bin
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "path=build/${{ matrix.preset }}/Release/kirend.exe" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=build/${{ matrix.preset }}/kirend" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check that the binary is standalone
+        run: |
+          bin='${{ steps.bin.outputs.path }}'
+          case "$RUNNER_OS" in
+            Linux)
+              # Only glibc itself may be linked dynamically; it is on every glibc-based distro.
+              deps=$(objdump -p "$bin" | awk '/NEEDED/ {print $2}')
+              bad=$(grep -Ev '^(libc|libm|libpthread|libdl|librt|ld-linux[^.]*)\.so' <<<"$deps" || true)
+              ;;
+            macOS)
+              # Only macOS system libraries (libSystem, libc++) may be linked dynamically.
+              deps=$(otool -L "$bin" | tail -n +2 | awk '{print $1}')
+              bad=$(grep -Ev '^(/usr/lib/|/System/Library/)' <<<"$deps" || true)
+              ;;
+            Windows)
+              # Windows system DLLs are fine; the C/C++ runtime DLLs are not.
+              deps=$(llvm-objdump -p "$bin" | awk '/DLL Name:/ {print $3}')
+              bad=$(grep -Ei '^(vcruntime|msvcp|ucrtbase|api-ms-win-crt|concrt|libstdc|libgcc|libwinpthread)' <<<"$deps" || true)
+              ;;
+          esac
+          echo "Dynamic dependencies of $bin:"
+          echo "$deps"
+          if [[ -n "$bad" ]]; then
+            echo "::error::$bin is not standalone, it needs: $(echo $bad)"
+            exit 1
+          fi
+          "$bin" --version
+
+      - name: Package
+        id: package
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            version="$GITHUB_REF_NAME"
+          else
+            version="${GITHUB_SHA::7}"
+          fi
+          name="kirend-$version-${{ matrix.name }}"
+          mkdir -p "dist/$name"
+          cp '${{ steps.bin.outputs.path }}' README.md "dist/$name/"
+          cd dist
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            7z a -tzip "$name.zip" "$name" > /dev/null
+            echo "file=dist/$name.zip" >> "$GITHUB_OUTPUT"
+          else
+            tar -czf "$name.tar.gz" "$name"
+            echo "file=dist/$name.tar.gz" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kirend-${{ matrix.name }}
+          path: ${{ steps.package.outputs.file }}
+          if-no-files-found: error
+
+      - name: Upload vcpkg logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vcpkg-logs-${{ matrix.name }}
+          path: ${{ env.VCPKG_ROOT }}/buildtrees/**/*.log
+          if-no-files-found: ignore
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: kirend-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          sha256sum kirend-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "KiRend $GITHUB_REF_NAME" \
+            --generate-notes \
+            kirend-* SHA256SUMS.txt
