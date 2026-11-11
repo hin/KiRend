@@ -30,6 +30,23 @@ jobs:
     outputs:
       matrix: ${{ steps.select.outputs.matrix }}
     steps:
+      # A release tag must match the version that `kirend --version` prints, so check it before
+      # spending an hour on builds.
+      - uses: actions/checkout@v5
+        if: startsWith(github.ref, 'refs/tags/v')
+
+      - name: Check that the tag matches the version in CMakeLists.txt and vcpkg.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          cmake_version=$(sed -nE '/^project\(kirend/,/\)/ s/^[[:space:]]*VERSION[[:space:]]+([0-9.]+).*/\1/p' CMakeLists.txt)
+          vcpkg_version=$(jq -r '."version-string"' vcpkg.json)
+          echo "Tag: $tag  CMakeLists.txt: $cmake_version  vcpkg.json: $vcpkg_version"
+          if [[ "$tag" != "$cmake_version" || "$tag" != "$vcpkg_version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match VERSION $cmake_version in CMakeLists.txt and version-string $vcpkg_version in vcpkg.json. Update both, commit, and tag that commit."
+            exit 1
+          fi
+
       - id: select
         name: Select platforms
         env:
