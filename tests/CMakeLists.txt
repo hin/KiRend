@@ -6,6 +6,7 @@ add_executable(kirend_tests
     test_camera.cpp
     test_paths.cpp
     test_outline.cpp
+    test_style.cpp
 )
 
 target_link_libraries(kirend_tests PRIVATE kirend_core GTest::gtest GTest::gtest_main)

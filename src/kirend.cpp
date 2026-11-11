@@ -10,6 +10,7 @@
 #include "paths/path_resolver.h"
 #include "pcb/board_reader.h"
 #include "render/line_renderer.h"
+#include "style/style.h"
 
 #include <algorithm>
 #include <chrono>
@@ -61,6 +62,27 @@ int RunRenderJob( const RenderJob& aJob, std::ostream& aLog )
 {
     Timer timer( aJob.verbose, aLog );
 
+    style::Style style;
+
+    try
+    {
+        style = aJob.styleFile.empty() ? style::DefaultStyle() : style::LoadStyleFile( aJob.styleFile );
+    }
+    catch( const std::exception& e )
+    {
+        aLog << "Error: " << e.what() << "\n";
+        return exit_code::ERR_ARGS;
+    }
+
+    // Command line options win over the style sheet.
+    if( !aJob.layers.empty() )
+        style.visible.layers = aJob.layers;
+
+    if( aJob.background == BackgroundStyle::Transparent )
+        style.background.reset();
+    else if( aJob.background == BackgroundStyle::Opaque && !style.background )
+        style.background = style::Color{ 255, 255, 255 };
+
     pcb::Board board;
 
     try
@@ -82,7 +104,7 @@ int RunRenderJob( const RenderJob& aJob, std::ostream& aLog )
     std::vector<std::string> layers;
     bool                     drawBody = false;
 
-    for( const std::string& name : aJob.layers )
+    for( const std::string& name : style.visible.layers )
     {
         std::string canonical = CanonicalLayerName( name, board );
 
@@ -121,11 +143,24 @@ int RunRenderJob( const RenderJob& aJob, std::ostream& aLog )
     if( drawBody )
     {
         scene.meshes.push_back( BuildBoardBodyMesh( outline, CollectDrillHoles( board ), heights, warnings ) );
+        scene.meshes.back().category = style::LineCategory::Board;
         timer.step( "board body" );
     }
 
+    LayerContent content;
+    content.pads = style.visible.pads;
+    content.tracks = style.visible.tracks;
+    content.vias = style.visible.vias;
+    content.graphics = style.visible.graphics;
+
     for( const std::string& layer : layers )
-        scene.lines.push_back( BuildLayerLines( board, layer, heights ) );
+    {
+        for( render::LineSet& set : BuildLayerLines( board, layer, heights, content ) )
+        {
+            if( !set.polylines.empty() )
+                scene.lines.push_back( std::move( set ) );
+        }
+    }
 
     // 3D models
     ResolverSettings resolverSettings;
@@ -145,8 +180,8 @@ int RunRenderJob( const RenderJob& aJob, std::ostream& aLog )
 
     for( const pcb::Footprint& fp : board.footprints )
     {
-        // KiCad's 3D viewer hides DNP footprints by default.
-        if( fp.dnp )
+        // KiCad's 3D viewer hides DNP footprints by default; the style can show them.
+        if( !style.visible.models || ( fp.dnp && !style.visible.dnp ) )
             continue;
 
         for( const pcb::Model3D& model : fp.models )
@@ -184,6 +219,7 @@ int RunRenderJob( const RenderJob& aJob, std::ostream& aLog )
 
             scene.meshes.push_back(
                     models::TransformMesh( *mesh, models::ModelTransform( fp, model, heights ) ) );
+            scene.meshes.back().category = style::LineCategory::Models;
             ++loaded;
         }
     }
@@ -196,11 +232,7 @@ int RunRenderJob( const RenderJob& aJob, std::ostream& aLog )
     std::vector<render::Polyline2D> lines = render::RenderLines( scene, camera );
     timer.step( "hidden line removal (" + std::to_string( lines.size() ) + " polylines)" );
 
-    output::SvgStyle style = output::DefaultStyle( camera.imageHeight() );
-    style.background = aJob.background == BackgroundStyle::Transparent ? output::Background::Transparent
-                                                                        : output::Background::White;
-
-    const std::string svg = output::WriteSvg( lines, camera.imageWidth(), camera.imageHeight(), style );
+    const std::string svg = output::WriteSvg( lines, camera.imageWidth(), camera.imageHeight(), style, aJob.dpi );
     const fs::path    outPath = aJob.output.empty() ? defaultOutputPath( aJob ) : aJob.output;
 
     try

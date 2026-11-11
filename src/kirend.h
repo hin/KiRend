@@ -30,8 +30,9 @@ struct RenderJob
     OutputFormat                       format = OutputFormat::Png;
     std::map<std::string, std::string> defines;
     render::CameraSettings             camera;
-    std::vector<std::string>           layers{ "Edge.Cuts" };
-    BackgroundStyle                    background = BackgroundStyle::Default;
+    std::filesystem::path              styleFile;       ///< empty: built-in default style
+    std::vector<std::string>           layers;          ///< empty: layers from the style
+    BackgroundStyle                    background = BackgroundStyle::Default; ///< Default: from the style
     double                             dpi = 300.0;
     bool                               verbose = false;
 };

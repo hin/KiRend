@@ -111,7 +111,8 @@ ParseResult ParseCommandLine( const std::vector<std::string>& aArgs, std::ostrea
     parser.add_argument( "--background" )
             .default_value( std::string() )
             .metavar( "BG" )
-            .help( "Image background. Options: default, transparent, opaque. Default: white" );
+            .help( "Image background. Options: default (from the style sheet, white), transparent, "
+                   "opaque" );
 
     parser.add_argument( "--perspective" ).flag().help( "Use perspective projection instead of orthogonal" );
 
@@ -133,19 +134,25 @@ ParseResult ParseCommandLine( const std::vector<std::string>& aArgs, std::ostrea
             .metavar( "ANGLES" )
             .help( "Rotate board, format 'X,Y,Z' e.g.: '-45,0,45' for isometric view" );
 
+    parser.add_argument( "--style" )
+            .default_value( std::string() )
+            .metavar( "STYLE_FILE" )
+            .help( "YAML style sheet with line widths, colours and what is drawn. Settings it "
+                   "leaves out keep their default; options on the command line win over it" );
+
     parser.add_argument( "-l", "--layers" )
-            .default_value( std::string( "Edge.Cuts" ) )
+            .default_value( std::string() )
             .metavar( "LAYER_LIST" )
             .help( "Comma separated list of layers to draw. Edge.Cuts draws the board body; copper "
                    "layers draw pads, tracks and vias; other layers draw their graphics. "
-                   "Default: Edge.Cuts" );
+                   "Default: from the style sheet (Edge.Cuts)" );
 
     parser.add_argument( "--dpi" )
             .default_value( 300.0 )
             .scan<'g', double>()
             .metavar( "DPI" )
-            .help( "Resolution stored in PNG files, so documents place them at the right size. "
-                   "Default: 300" );
+            .help( "Resolution stored in PNG files, so documents place them at the right size. Also "
+                   "converts the style's line widths from points to pixels. Default: 300" );
 
     parser.add_argument( "-v", "--verbose" ).flag().help( "Print progress and resolved model paths" );
 
@@ -309,6 +316,7 @@ ParseResult ParseCommandLine( const std::vector<std::string>& aArgs, std::ostrea
         return result;
     }
 
+    job.styleFile = parser.get<std::string>( "--style" );
     job.layers.clear();
 
     for( const std::string& layer : split( parser.get<std::string>( "--layers" ), ',' ) )

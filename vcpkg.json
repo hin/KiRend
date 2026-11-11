@@ -11,6 +11,7 @@
     "nlohmann-json",
     "argparse",
     "lunasvg",
+    "yaml-cpp",
     "gtest"
   ],
   "builtin-baseline": "c145394a1e3121e823e9fb7ad54b46289ac50da1"

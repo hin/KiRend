@@ -260,8 +260,9 @@ private:
 struct Segment2D
 {
     Vec2 a;
-    Vec2 b;
-    bool outline;
+    Vec2                b;
+    bool                outline;
+    style::LineCategory category;
 };
 
 
@@ -276,7 +277,7 @@ public:
     {
     }
 
-    void addSegment( const Vec3& aA, const Vec3& aB, bool aOutline )
+    void addSegment( const Vec3& aA, const Vec3& aB, bool aOutline, style::LineCategory aCategory )
     {
         Vec3      a = aA;
         Vec3      b = aB;
@@ -323,7 +324,7 @@ public:
             {
                 Projected q0 = ( runStart == 0 ) ? pa : m_camera.project( a + ( b - a ) * t0 );
                 Projected q1 = ( aEnd == steps ) ? pb : m_camera.project( a + ( b - a ) * t1 );
-                m_segments.push_back( { { q0.u, q0.v }, { q1.u, q1.v }, aOutline } );
+                m_segments.push_back( { { q0.u, q0.v }, { q1.u, q1.v }, aOutline, aCategory } );
             }
 
             runStart = -1;
@@ -429,15 +430,17 @@ std::vector<Polyline2D> chainSegments( const std::vector<Segment2D>& aSegments, 
 {
     std::vector<Polyline2D> result;
 
-    for( int pass = 0; pass < 2; ++pass )
+    // One pass per line category and kind (outline or not), so each polyline has one style.
+    for( size_t pass = 0; pass < 2 * style::LINE_CATEGORY_COUNT; ++pass )
     {
-        const bool outline = ( pass == 1 );
+        const bool                outline = ( pass % 2 ) == 1;
+        const style::LineCategory category = static_cast<style::LineCategory>( pass / 2 );
 
         std::vector<const Segment2D*> segs;
 
         for( const Segment2D& s : aSegments )
         {
-            if( s.outline == outline && ( s.a - s.b ).length() > 1e-9 )
+            if( s.outline == outline && s.category == category && ( s.a - s.b ).length() > 1e-9 )
                 segs.push_back( &s );
         }
 
@@ -514,6 +517,7 @@ std::vector<Polyline2D> chainSegments( const std::vector<Segment2D>& aSegments, 
 
             Polyline2D line;
             line.outline = outline;
+            line.category = category;
             simplify( chain, aSimplifyTolerance, line.points );
             result.push_back( std::move( line ) );
         }
@@ -602,7 +606,7 @@ std::vector<Polyline2D> RenderLines( const Scene& aScene, const Camera& aCamera,
             if( !e.feature && !boundary && !silhouette )
                 continue;
 
-            collector.addSegment( pm.vertices[e.v0], pm.vertices[e.v1], silhouette || boundary );
+            collector.addSegment( pm.vertices[e.v0], pm.vertices[e.v1], silhouette || boundary, aScene.meshes[m].category );
         }
     }
 
@@ -611,7 +615,7 @@ std::vector<Polyline2D> RenderLines( const Scene& aScene, const Camera& aCamera,
         for( const std::vector<Vec3>& poly : set.polylines )
         {
             for( size_t i = 0; i + 1 < poly.size(); ++i )
-                collector.addSegment( poly[i], poly[i + 1], false );
+                collector.addSegment( poly[i], poly[i + 1], false, set.category );
         }
     }
 
