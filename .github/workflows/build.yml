@@ -62,9 +62,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install Ninja (Linux)
+      - name: Install build tools (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
+        # OpenCASCADE needs the OpenGL and EGL headers to build, even though KiRend doesn't use them.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build pkg-config zip unzip libgl1-mesa-dev libegl-dev
 
       - name: Install Ninja (macOS)
         if: runner.os == 'macOS'
