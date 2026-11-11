@@ -33,7 +33,9 @@ Debian 12 or later); the macOS binary needs macOS 15 or newer.
 The macOS binary is not signed. After downloading it with a browser, remove the quarantine flag
 once: `xattr -d com.apple.quarantine kirend`.
 
-Releases are built by GitHub Actions (`.github/workflows/build.yml`) when a version tag is pushed:
+Releases are built by GitHub Actions (`.github/workflows/build.yml`) when a version tag is pushed.
+First set the new version in both `CMakeLists.txt` (`project(... VERSION x.y.z)`) and `vcpkg.json`
+(`version-string`) and commit it; the release fails if the tag doesn't match both:
 
 ```sh
 git tag v0.1.0
