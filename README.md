@@ -155,3 +155,9 @@ All are fetched by vcpkg (see `vcpkg.json`, pinned with `builtin-baseline`):
 | p-ranav/argparse | Command line | MIT |
 | lunasvg (with plutovg) | SVG to PNG | MIT |
 | GoogleTest | Unit tests only | BSD |
+
+## License
+
+KiRend is released under the [BSD 2-Clause License](LICENSE). The third-party libraries above keep
+their own licenses; the release archives include their license texts in
+`THIRD-PARTY-LICENSES.txt`.
