@@ -5,6 +5,12 @@ background, in the style of assembly instructions. Output is SVG or PNG. The cam
 the same as `kicad-cli pcb render`, and the image is framed exactly like kicad-cli's, so the two
 can be overlaid.
 
+![Isometric line-art render of KiCad's royalblue54L_feather demo board](docs/images/royalblue54l_feather.png)
+
+*KiCad's `royalblue54L_feather` demo board rendered by KiRend in isometric view. The board design is
+from the [KiCad demos](https://gitlab.com/kicad/code/kicad/-/tree/master/demos) (CC BY-SA 4.0);
+this image is likewise licensed under CC BY-SA 4.0.*
+
 ```
 kirend [options] INPUT_FILE
 kirend -o board.svg --rotate '-45,0,45' --layers Edge.Cuts,F.Cu,F.SilkS my_board.kicad_pcb
@@ -159,6 +165,7 @@ All are fetched by vcpkg (see `vcpkg.json`, pinned with `builtin-baseline`):
 
 ## License
 
-KiRend is released under the [BSD 2-Clause License](LICENSE). The third-party libraries above keep
-their own licenses; the release archives include their license texts in
-`THIRD-PARTY-LICENSES.txt`.
+KiRend is released under the [BSD 2-Clause License](LICENSE). The example image
+`docs/images/royalblue54l_feather.png` is a render of a KiCad demo board and is licensed under
+CC BY-SA 4.0. The third-party libraries above keep their own licenses; the release archives
+include their license texts in `THIRD-PARTY-LICENSES.txt`.
