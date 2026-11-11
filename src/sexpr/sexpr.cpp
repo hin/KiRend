@@ -1,8 +1,10 @@
 #include "sexpr/sexpr.h"
 
-#include <charconv>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <locale>
+#include <sstream>
 
 namespace kirend::sexpr {
 
@@ -128,14 +130,18 @@ std::optional<double> ToNumber( std::string_view aText )
     if( aText.empty() )
         return std::nullopt;
 
-    // std::from_chars for double is locale independent but doesn't accept a leading '+'.
-    if( aText.front() == '+' )
-        aText.remove_prefix( 1 );
+    // std::from_chars would be simpler, but Apple's libc++ doesn't support it for floating point.
+    // A stream with the classic "C" locale is locale independent too. Streams skip leading
+    // whitespace, so reject it here, and require the whole text to be a number.
+    if( std::isspace( static_cast<unsigned char>( aText.front() ) ) )
+        return std::nullopt;
 
     double value = 0.0;
-    auto [ptr, ec] = std::from_chars( aText.data(), aText.data() + aText.size(), value );
+    std::istringstream stream{ std::string( aText ) };
+    stream.imbue( std::locale::classic() );
+    stream >> value;
 
-    if( ec != std::errc() || ptr != aText.data() + aText.size() )
+    if( stream.fail() || stream.peek() != std::char_traits<char>::eof() )
         return std::nullopt;
 
     return value;
