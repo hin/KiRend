@@ -33,16 +33,29 @@
       "architecture": "x64",
       "cacheVariables": { "VCPKG_TARGET_TRIPLET": "x64-windows-static-md" },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "msys2",
+      "inherits": "base",
+      "displayName": "Windows MSYS2 UCRT64 (Ninja, GCC, standalone exe)",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-mingw-static-release",
+        "VCPKG_HOST_TRIPLET": "x64-mingw-static-release"
+      },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
     }
   ],
   "buildPresets": [
     { "name": "macos", "configurePreset": "macos" },
     { "name": "linux", "configurePreset": "linux" },
-    { "name": "windows", "configurePreset": "windows", "configuration": "Release" }
+    { "name": "windows", "configurePreset": "windows", "configuration": "Release" },
+    { "name": "msys2", "configurePreset": "msys2" }
   ],
   "testPresets": [
     { "name": "macos", "configurePreset": "macos", "output": { "outputOnFailure": true } },
     { "name": "linux", "configurePreset": "linux", "output": { "outputOnFailure": true } },
-    { "name": "windows", "configurePreset": "windows", "configuration": "Release", "output": { "outputOnFailure": true } }
+    { "name": "windows", "configurePreset": "windows", "configuration": "Release", "output": { "outputOnFailure": true } },
+    { "name": "msys2", "configurePreset": "msys2", "output": { "outputOnFailure": true } }
   ]
 }

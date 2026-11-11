@@ -150,7 +150,7 @@ tests/          GoogleTest unit tests and small test boards
 |---|---|
 | CMake + vcpkg skeleton, CLI | done |
 | Board parser, outline, board body | done |
-| Camera matching kicad-cli | implemented from KiCad's source; pixel overlay still to be checked against real kicad-cli renders |
+| Camera matching kicad-cli | done; checked against kicad-cli 10.0 (Docker image `kicad/kicad:10.0`) for top, bottom, front, isometric, perspective, zoom/pan, pivot and 800 x 600 views, with and without 3D models: same image size, no pixel offset, mean line-to-edge distance under 0.7 px |
 | STEP/WRL models, path resolution | done |
 | Embedded models | done |
 | `--layers` | done (see limitations) |

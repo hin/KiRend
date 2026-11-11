@@ -65,6 +65,18 @@ else()
     target_compile_options(kirend_core PRIVATE -Wall -Wextra)
 endif()
 
+# MinGW (MSYS2): link libstdc++, libgcc and winpthread statically, so kirend.exe runs without
+# the MinGW runtime DLLs. All other dependencies are static through the vcpkg triplet.
+if(MINGW)
+    target_link_options(kirend_core PUBLIC -static)
+endif()
+
+# OpenCASCADE headers use M_PI, which MinGW and MSVC only define with _USE_MATH_DEFINES in strict
+# C++20 mode.
+if(WIN32)
+    target_compile_definitions(kirend_core PUBLIC _USE_MATH_DEFINES)
+endif()
+
 add_executable(kirend src/main.cpp)
 target_link_libraries(kirend PRIVATE kirend_core)
 
